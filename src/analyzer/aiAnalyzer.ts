@@ -117,33 +117,43 @@ export class AICodeAnalyzer implements CodeAnalyzer {
       const issues: ReviewIssue[] = [];
       const comments: ReviewComment[] = [];
       
-      // 解析高严重性问题
-      const highSeverityMatch = aiReply.match(/### 高严重性问题\n([\s\S]*?)(?=###|##|$)/);
-      if (highSeverityMatch && highSeverityMatch[1]) {
-        const highSeverityIssues = this.parseIssuesFromSection(highSeverityMatch[1], 'high');
-        issues.push(...highSeverityIssues);
+      try {
+        // 解析高严重性问题
+        const highSeverityMatch = aiReply.match(/### 高严重性问题\n([\s\S]*?)(?=###|##|$)/);
+        if (highSeverityMatch && highSeverityMatch[1]) {
+          const highSeverityIssues = this.parseIssuesFromSection(highSeverityMatch[1], 'high');
+          issues.push(...highSeverityIssues);
+        }
+        
+        // 解析中等严重性问题
+        const mediumSeverityMatch = aiReply.match(/### 中等严重性问题\n([\s\S]*?)(?=###|##|$)/);
+        if (mediumSeverityMatch && mediumSeverityMatch[1]) {
+          const mediumSeverityIssues = this.parseIssuesFromSection(mediumSeverityMatch[1], 'medium');
+          issues.push(...mediumSeverityIssues);
+        }
+        
+        // 解析低严重性问题
+        const lowSeverityMatch = aiReply.match(/### 低严重性问题\n([\s\S]*?)(?=###|##|$)/);
+        if (lowSeverityMatch && lowSeverityMatch[1]) {
+          const lowSeverityIssues = this.parseIssuesFromSection(lowSeverityMatch[1], 'low');
+          issues.push(...lowSeverityIssues);
+        }
+        
+        logger.info(`共解析出 ${issues.length} 个问题`);
+        
+        // 提取行内评论
+        const extractedComments = this.extractLineComments(aiReply, diffs);
+        comments.push(...extractedComments);
+      } catch (parseError) {
+        logger.error('解析AI回复时发生错误:', parseError);
+        // 虽然解析错误，但仍继续返回原始内容
+        logger.warn('将返回未处理的AI回复作为summary');
       }
-      
-      // 解析中等严重性问题
-      const mediumSeverityMatch = aiReply.match(/### 中等严重性问题\n([\s\S]*?)(?=###|##|$)/);
-      if (mediumSeverityMatch && mediumSeverityMatch[1]) {
-        const mediumSeverityIssues = this.parseIssuesFromSection(mediumSeverityMatch[1], 'medium');
-        issues.push(...mediumSeverityIssues);
-      }
-      
-      // 解析低严重性问题
-      const lowSeverityMatch = aiReply.match(/### 低严重性问题\n([\s\S]*?)(?=###|##|$)/);
-      if (lowSeverityMatch && lowSeverityMatch[1]) {
-        const lowSeverityIssues = this.parseIssuesFromSection(lowSeverityMatch[1], 'low');
-        issues.push(...lowSeverityIssues);
-      }
-      
-      logger.info(`共解析出 ${issues.length} 个问题`);
       
       return {
         comments,
         issues,
-        summary: aiReply
+        summary: aiReply // 直接使用AI回复作为summary
       };
     } catch (error) {
       logger.error('AI分析过程中发生错误:', error);
@@ -178,23 +188,126 @@ export class AICodeAnalyzer implements CodeAnalyzer {
   }
   
   /**
+   * 从AI回复中提取行内评论
+   * @param aiReply AI返回的完整回复内容
+   * @param diffs PR差异信息
+   * @returns 提取的行内评论列表
+   */
+  private extractLineComments(aiReply: string, diffs: PRDiff[]): ReviewComment[] {
+    const comments: ReviewComment[] = [];
+    // 使用更宽松的正则表达式，避免直接使用emoji字符
+    const problemsMatch = aiReply.match(/##\s*问题点:?([\s\S]*?)(?=##|$)/);
+    
+    if (problemsMatch && problemsMatch[1]) {
+      const problemsSection = problemsMatch[1].trim();
+      // 匹配每个问题条目，更宽松的模式
+      const problemRegex = /\d+\.\s+(.+?)\s+-\s+在\s+([^:]+):(\d+)/g;
+      
+      let match;
+      while ((match = problemRegex.exec(problemsSection)) !== null) {
+        const [_, body, path, lineStr] = match;
+        const lineNumber = parseInt(lineStr, 10);
+        
+        if (!isNaN(lineNumber) && path) {
+          // 尝试找到对应的diff
+          const diff = diffs.find(d => d.filename === path || d.filename.endsWith(`/${path}`));
+          
+          if (diff && diff.patch) {
+            // 尝试计算position信息
+            const position = this.calculatePosition(diff.patch, lineNumber);
+            
+            comments.push({
+              path,
+              body: this.formatCommentBody(body),
+              position: position
+            });
+            
+            logger.debug(`提取到行内评论：文件=${path}, 行=${lineNumber}, position=${position}`);
+          } else {
+            // 如果找不到对应diff或无法计算position，仍添加评论但不带position
+            comments.push({
+              path,
+              body: this.formatCommentBody(body),
+              position: undefined
+            });
+            
+            logger.debug(`提取到文件评论（无position）：文件=${path}, 行=${lineNumber}`);
+          }
+        }
+      }
+    }
+    
+    logger.info(`从AI回复中提取了${comments.length}个评论`);
+    return comments;
+  }
+  
+  /**
+   * 格式化评论内容，确保Markdown格式正确
+   * @param body 原始评论内容
+   * @returns 格式化后的评论内容
+   */
+  private formatCommentBody(body: string): string {
+    // 移除开头的空格和破折号
+    body = body.trim().replace(/^[\s-]+/, '');
+    // 确保以句号结尾
+    if (!body.endsWith('.') && !body.endsWith('?') && !body.endsWith('!')) {
+      body += '.';
+    }
+    return body;
+  }
+  
+  /**
+   * 尝试根据diff和行号计算GitHub PR的position值
+   * @param patch diff补丁内容
+   * @param targetLine 目标行号
+   * @returns 计算出的position或undefined
+   */
+  private calculatePosition(patch: string, targetLine: number): number | undefined {
+    try {
+      const lines = patch.split('\n');
+      let currentLine = 0;
+      let position = 0;
+      
+      // 寻找目标行对应的position
+      for (const line of lines) {
+        position++;
+        
+        // 跳过diff头部
+        if (line.startsWith('@@')) {
+          const match = line.match(/@@ -\d+,\d+ \+(\d+),\d+ @@/);
+          if (match) {
+            currentLine = parseInt(match[1], 10) - 1;
+          }
+          continue;
+        }
+        
+        // 只关注添加或不变的行（删除的行不在新文件中）
+        if (!line.startsWith('-')) {
+          currentLine++;
+        }
+        
+        // 找到目标行
+        if (currentLine === targetLine) {
+          return position;
+        }
+      }
+      
+      return undefined;
+    } catch (error) {
+      logger.warn(`计算position时出错: ${error instanceof Error ? error.message : String(error)}`);
+      return undefined;
+    }
+  }
+  
+  /**
    * 准备发送给AI的提示内容
    */
   private preparePromptFromDiffs(diffs: PRDiff[]): string {
-    // 构建系统消息
+    // 更新系统提示
     let systemPrompt = `你是一位专业的高级代码审查专家，拥有多年软件开发和代码审查经验。
-你的任务是对提交的代码变更进行全面、专业、有建设性的代码审查，提供具体、可操作的改进建议。
-你应该重点关注代码的以下方面：
-1. 代码质量：可读性、可维护性、命名规范、注释完整性
-2. 架构设计：模块化、职责分离、依赖关系
-3. 性能问题：算法效率、资源使用、可能的性能瓶颈
-4. 安全隐患：潜在的安全漏洞、未验证的输入、敏感数据处理
-5. 最佳实践：是否遵循行业最佳实践和设计模式
-6. 潜在的bug：逻辑错误、边界条件、异常处理
-7. 代码重复：可能的重复代码和重构机会
-
-请提供具体、明确的建议，而不是笼统的评论。包括具体的代码示例来说明如何改进。
-你的回应必须客观、有建设性、专业，避免对代码作者的主观评价。`;
+你的任务是对提交的代码变更进行全面、专业、有建设性的代码审查。
+你必须严格按照指定的Markdown格式返回结果，包含表情符号，并确保内容具体、可操作。
+分析代码优点与问题点，并给出具体修改建议。`;
 
     // 构建用户提示
     let userPrompt = `## 代码审查请求
@@ -227,37 +340,41 @@ export class AICodeAnalyzer implements CodeAnalyzer {
       }
     });
 
+    // 新的详细输出格式要求
     userPrompt += `\n### 请求的审查格式
 
-请按照以下格式提供你的代码审查结果：
+你必须严格按照以下格式提供代码审查结果，包含所有指定的表情符号：
 
-## 总体评价
-[对整体代码质量的评价，包括主要优点和需要改进的地方]
+## 😀代码评分: [0-100分]
 
-## 问题列表
-### 高严重性问题
+## ✅代码优点:
+1. [优点1描述，具体说明代码的哪些方面做得好]
+2. [优点2描述]
+3. [优点3描述]
+（列出至少3-5个优点，如果确实很少则至少2个）
+
+## 🤔问题点:
 1. [问题1描述] - 在 [文件名]:[行号]
-   - [改进建议，最好包含代码示例]
+2. [问题2描述] - 在 [文件名]:[行号]
+3. [问题3描述] - 在 [文件名]:[行号]
+（按重要性排序，每个问题必须指明具体文件和行号）
 
-### 中等严重性问题
-1. [问题1描述] - 在 [文件名]:[行号]
-   - [改进建议，最好包含代码示例]
+## 🎯修改建议:
+1. [建议1，针对具体问题，包含代码示例]
+2. [建议2，针对具体问题，包含代码示例]
+3. [建议3，针对具体问题，包含代码示例]
+（针对上述问题提供具体的修改建议，尽可能包含代码示例）
 
-### 低严重性问题
-1. [问题1描述] - 在 [文件名]:[行号]
-   - [改进建议，最好包含代码示例]
+## 💻修改后的代码:
+如果有重要修改建议，提供修改后的代码示例:
 
-## 改进建议
-[更广泛的改进建议，可能涉及架构、设计模式或最佳实践]
+\`\`\`[语言]
+[改进后的完整代码片段，而不仅仅是修改部分]
+\`\`\`
 
-## 安全评估
-[任何安全相关的问题或建议]
-
-## 代码质量评分
-[1-10分，根据代码质量给出评分，附带简短解释]
+必须严格遵循此格式，不要省略任何部分或添加额外部分。确保使用正确的表情符号和Markdown格式。
 `;
 
-    // 返回最终的提示：结合系统提示和用户提示
     return `${systemPrompt}\n\n${userPrompt}`;
   }
 } 
