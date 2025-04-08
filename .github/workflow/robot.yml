@@ -31,13 +31,13 @@ jobs:
 
       - name: Create env file
         run: |
-          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" > codereview/.env
-          echo "GITHUB_OWNER=${{ github.repository_owner }}" >> codereview/.env
-          echo "GITHUB_REPO=${{ github.event.repository.name }}" >> codereview/.env
-          echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> codereview/.env
-          echo "LOG_LEVEL=info" >> codereview/.env
-          echo "DRY_RUN=false" >> codereview/.env
-          echo "TEST_MODE=false" >> codereview/.env
+          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" > .env
+          echo "GITHUB_OWNER=${{ github.repository_owner }}" >> .env
+          echo "GITHUB_REPO=${{ github.event.repository.name }}" >> .env
+          echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> .env
+          echo "LOG_LEVEL=info" >> .env
+          echo "DRY_RUN=false" >> .env
+          echo "TEST_MODE=false" >> .env
 
       - name: Run code review
         run: npm start

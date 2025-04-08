@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 // 找到并加载环境变量文件
-const envPath = path.resolve(process.cwd(), 'codereview', '.env');
+const envPath = path.resolve(process.cwd(), '.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });
   console.log(`已加载环境变量文件: ${envPath}`);
