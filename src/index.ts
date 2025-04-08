@@ -1,5 +1,4 @@
 import { GitHubClient } from './github/client';
-import { MockCodeAnalyzer } from './analyzer/mockAnalyzer';
 import { AICodeAnalyzer } from './analyzer/aiAnalyzer';
 import { GitHubCommentReporter } from './reporter/commentReporter';
 import { logger } from './utils/logger';
@@ -34,9 +33,8 @@ async function main() {
     
     // 检查配置模式
     const isDryRun = process.env.DRY_RUN === 'true';
-    const useAI = process.env.AI_API_KEY && process.env.AI_API_KEY.trim() !== '';
     
-    logger.info(`运行模式: 正常模式${isDryRun ? ' (干运行)' : ''}${useAI ? ' (使用AI)' : ' (不使用AI)'}`);
+    logger.info(`运行模式: 正常模式${isDryRun ? ' (干运行)' : ''}`);
     
     let diffs = [];
     let reviewResult;
@@ -46,14 +44,8 @@ async function main() {
     
     // 选择代码分析器
     let analyzer;
-    if (useAI) {
       analyzer = new AICodeAnalyzer();
       logger.info('使用AI代码分析器');
-    } else {
-      analyzer = new MockCodeAnalyzer();
-      logger.info('使用模拟代码分析器');
-    }
-    
     // 初始化报告生成器
     const reporter = new GitHubCommentReporter(githubClient);
     
