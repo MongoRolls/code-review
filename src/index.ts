@@ -2,6 +2,26 @@ import { GitHubClient } from './github/client';
 import { MockCodeAnalyzer } from './analyzer/mockAnalyzer';
 import { GitHubCommentReporter } from './reporter/commentReporter';
 import { logger } from './utils/logger';
+import { PRDiff } from './github/types';
+
+/**
+ * 打印差异详细信息
+ */
+function printDiffDetails(diffs: PRDiff[]) {
+  logger.info('------------------------');
+  logger.info('差异详细信息:');
+  diffs.forEach((diff, index) => {
+    logger.info(`\n[文件 ${index + 1}/${diffs.length}] ${diff.filename} (状态: ${diff.status})`);
+    logger.info(`添加: ${diff.additions} 行, 删除: ${diff.deletions} 行, 变更: ${diff.changes} 行`);
+    if (diff.patch) {
+      logger.info('差异内容:');
+      console.log(diff.patch);
+    } else {
+      logger.info('没有可用的差异内容');
+    }
+    logger.info('------------------------');
+  });
+}
 
 /**
  * 主要执行函数
@@ -44,6 +64,9 @@ async function main() {
       logger.info('正在获取PR差异...');
       diffs = await githubClient.getPRDiffs();
       logger.info(`获取到 ${diffs.length} 个文件的差异`);
+      
+      // 打印差异详细信息
+      printDiffDetails(diffs);
       
       // 2. 分析差异
       logger.info('正在分析差异...');
