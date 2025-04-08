@@ -37,7 +37,6 @@ jobs:
           echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> .env
           echo "LOG_LEVEL=info" >> .env
           echo "DRY_RUN=false" >> .env
-          echo "TEST_MODE=false" >> .env
 
       - name: Run code review
         run: npm start

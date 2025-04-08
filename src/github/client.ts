@@ -3,6 +3,10 @@ import { getConfig } from '../utils/config';
 import { logger } from '../utils/logger';
 import { PRDiff, ReviewComment } from './types';
 
+/**
+ * GitHub客户端
+ * 负责与GitHub API进行交互，获取PR的差异信息和评论
+ */
 export class GitHubClient {
   private octokit: Octokit;
   private owner: string;
