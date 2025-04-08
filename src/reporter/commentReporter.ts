@@ -28,17 +28,8 @@ export class GitHubCommentReporter implements Reporter {
       const commentsWithPosition = result.comments.filter(comment => comment.position !== undefined);
       const commentsWithoutPosition = result.comments.filter(comment => comment.position === undefined);
       
-      // 验证AI响应格式
-      const isValidFormat = this.validateAIResponse(result.summary);
-      
-      // 根据验证结果决定评论正文
+      // 直接使用原始summary作为评论正文
       let commentBody = result.summary;
-      
-      // 如果格式无效，添加警告标记
-      if (!isValidFormat) {
-        logger.warn('AI响应格式不符合预期');
-        commentBody = `⚠️ *AI评论格式异常，请检查系统配置*\n\n${result.summary}`;
-      }
       
       // 添加页脚
       commentBody += '\n\n---\n*此评论由自动代码审查工具生成*';
@@ -58,36 +49,5 @@ export class GitHubCommentReporter implements Reporter {
       logger.error('提交审查结果失败:', error);
       throw new Error(`提交审查结果失败: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }
-  
-  /**
-   * 验证AI响应格式
-   * @param summary AI返回的完整响应
-   * @returns 格式是否有效
-   */
-  private validateAIResponse(summary: string): boolean {
-    // 使用更宽松的正则表达式检查必要部分，避免使用emoji字符
-    const requiredSections = [
-      /##\s*代码评分:?/i,        // 对应"😀代码评分"
-      /##\s*代码优点:?/i,        // 对应"✅代码优点"
-      /##\s*问题点:?/i,          // 对应"🤔问题点"
-      /##\s*修改建议:?/i         // 对应"🎯修改建议"
-    ];
-    
-    // 检查所有必要部分是否存在
-    const valid = requiredSections.every(regex => regex.test(summary));
-    
-    if (!valid) {
-      // 找出缺失的部分，便于调试
-      const missingSections = requiredSections
-        .filter(regex => !regex.test(summary))
-        .map(regex => regex.toString());
-      
-      logger.warn(`AI响应格式验证失败，缺少以下部分: ${missingSections.join(', ')}`);
-    } else {
-      logger.debug('AI响应格式验证通过');
-    }
-    
-    return valid;
   }
 } 
