@@ -51,7 +51,7 @@ cp .env.example .env
 ```
 
 2. 编辑`.env`文件，填入必要的配置信息:
-   - `GITHUB_TOKEN`: GitHub个人访问令牌
+   - `PERSONAL_TOKEN`: GitHub个人访问令牌
    - `GITHUB_OWNER`: GitHub仓库所有者
    - `GITHUB_REPO`: GitHub仓库名称
    - `PR_NUMBER`: 要审查的PR编号

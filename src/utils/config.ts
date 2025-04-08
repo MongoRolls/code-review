@@ -22,9 +22,9 @@ export interface Config {
 
 export function getConfig(): Config {
   // 检查必要的环境变量
-  const githubToken = process.env.GITHUB_TOKEN;
+  const githubToken = process.env.PERSONAL_TOKEN;
   if (!githubToken) {
-    throw new Error('缺少环境变量: GITHUB_TOKEN');
+    throw new Error('缺少环境变量: PERSONAL_TOKEN');
   }
 
   const githubOwner = process.env.GITHUB_OWNER;

@@ -20,6 +20,7 @@ function printDiffDetails(diffs: PRDiff[]) {
     } else {
       logger.info('没有可用的差异内容');
     }
+
     logger.info('------------------------\n\n');
   });
 }
@@ -64,6 +65,7 @@ async function main() {
     logger.info(`获取到 ${diffs.length} 个文件的差异`);
     
     // 打印差异详细信息
+    logger.debug('差异详细信息:');
     printDiffDetails(diffs);
     
     // 2. 分析差异
@@ -77,6 +79,7 @@ async function main() {
       logger.info('正在提交审查结果...');
       await reporter.submit(reviewResult);
       logger.info('审查结果已提交');
+
     }
     
     // 打印审查结果
