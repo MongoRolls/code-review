@@ -1,5 +1,5 @@
 import { Reporter } from './interface';
-import { ReviewResult, ReviewIssue } from '../github/types';
+import { ReviewResult, ReviewIssue, ReviewComment } from '../github/types';
 import { GitHubClient } from '../github/client';
 import { logger } from '../utils/logger';
 
@@ -24,12 +24,21 @@ export class GitHubCommentReporter implements Reporter {
     logger.info('开始提交审查结果');
     
     try {
-      // 1. 提交总体评论（摘要）
-      await this.submitSummaryComment(result);
+      // 分离有position和无position的评论
+      const commentsWithPosition = result.comments.filter(comment => comment.position !== undefined);
+      const commentsWithoutPosition = result.comments.filter(comment => comment.position === undefined);
       
-      // 2. 提交文件级别评论
-      if (result.comments.length > 0) {
-        await this.githubClient.createPRReviewComment(result.comments);
+      // 构建评论正文（包含摘要、问题和文件级评论）
+      const commentBody = this.formatSummaryComment(result, commentsWithoutPosition);
+      
+      // 1. 提交总体评论（摘要和文件级评论）
+      await this.githubClient.createPRComment(commentBody);
+      logger.info('已提交总体评论和文件级评论');
+      
+      // 2. 提交行级评论（如果有）
+      if (commentsWithPosition.length > 0) {
+        await this.githubClient.createPRReviewComment(commentsWithPosition);
+        logger.info(`已提交${commentsWithPosition.length}个行内评论`);
       }
       
       logger.info('审查结果提交完成');
@@ -40,21 +49,9 @@ export class GitHubCommentReporter implements Reporter {
   }
   
   /**
-   * 提交总体评论（包含摘要和高级别问题）
-   */
-  private async submitSummaryComment(result: ReviewResult): Promise<void> {
-    // 构建评论正文
-    const commentBody = this.formatSummaryComment(result);
-    
-    // 提交评论
-    await this.githubClient.createPRComment(commentBody);
-    logger.info('已提交总体评论');
-  }
-  
-  /**
    * 格式化总体评论
    */
-  private formatSummaryComment(result: ReviewResult): string {
+  private formatSummaryComment(result: ReviewResult, fileComments: ReviewComment[] = []): string {
     // 使用结果中的摘要作为基础
     let comment = result.summary;
     
@@ -84,6 +81,30 @@ export class GitHubCommentReporter implements Reporter {
         comment += '### 低严重性问题\n\n';
         comment += this.formatIssueList(lowIssues);
       }
+    }
+    
+    // 添加文件级评论（如果有）
+    if (fileComments.length > 0) {
+      comment += '\n\n## 文件评论\n\n';
+      
+      // 按文件分组评论
+      const commentsByFile: Record<string, ReviewComment[]> = {};
+      
+      fileComments.forEach(comment => {
+        if (!commentsByFile[comment.path]) {
+          commentsByFile[comment.path] = [];
+        }
+        commentsByFile[comment.path].push(comment);
+      });
+      
+      // 为每个文件添加评论
+      Object.entries(commentsByFile).forEach(([file, comments]) => {
+        comment += `### ${file}\n\n`;
+        
+        comments.forEach((fileComment, index) => {
+          comment += `${index + 1}. ${fileComment.body}\n\n`;
+        });
+      });
     }
     
     // 添加页脚

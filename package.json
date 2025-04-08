@@ -1,7 +1,7 @@
 {
   "name": "codereview",
   "version": "1.0.0",
-  "description": "",
+  "description": "ai code review",
   "main": "index.js",
   "scripts": {
     "build": "tsc",
@@ -9,7 +9,7 @@
     "dev": "ts-node src/index.ts"
   },
   "keywords": [],
-  "author": "",
+  "author": "xzc",
   "license": "ISC",
   "dependencies": {
     "@octokit/rest": "^19.0.13",

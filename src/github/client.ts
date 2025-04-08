@@ -3,6 +3,10 @@ import { getConfig } from '../utils/config';
 import { logger } from '../utils/logger';
 import { PRDiff, ReviewComment } from './types';
 
+/**
+ * GitHub客户端
+ * 负责与GitHub API进行交互，获取PR的差异信息和评论
+ */
 export class GitHubClient {
   private octokit: Octokit;
   private owner: string;
@@ -93,7 +97,15 @@ export class GitHubClient {
         return;
       }
 
-      logger.info(`在PR #${this.prNumber}上创建${comments.length}个审查评论`);
+      // 过滤出有position的评论
+      const commentsWithPosition = comments.filter(comment => comment.position !== undefined);
+      
+      if (commentsWithPosition.length === 0) {
+        logger.info('没有带position的评论需要提交为行内评论');
+        return;
+      }
+
+      logger.info(`在PR #${this.prNumber}上创建${commentsWithPosition.length}个带position的行内评论`);
       
       // 获取最新的commit SHA
       const { data: pullRequest } = await this.octokit.pulls.get({
@@ -104,25 +116,25 @@ export class GitHubClient {
 
       const commitId = pullRequest.head.sha;
       
-      // 创建审查
+      // 创建行内评论审查
       await this.octokit.pulls.createReview({
         owner: this.owner,
         repo: this.repo,
         pull_number: this.prNumber,
         commit_id: commitId,
-        comments: comments.map(comment => ({
+        comments: commentsWithPosition.map(comment => ({
           path: comment.path,
           position: comment.position,
           body: comment.body,
-          line: comment.position // 使用position作为line
+          line: comment.position
         })),
         event: 'COMMENT' // 提交为评论，不批准或请求更改
       });
 
-      logger.info('审查评论创建成功');
+      logger.info('行内审查评论创建成功');
     } catch (error) {
-      logger.error('创建审查评论失败:', error);
-      throw new Error(`创建审查评论失败: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error('创建行内审查评论失败:', error);
+      throw new Error(`创建行内审查评论失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 } 
