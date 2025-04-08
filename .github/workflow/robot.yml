@@ -1,0 +1,46 @@
+name: code review
+
+on: 
+  push: 
+    branches: 
+      - main 
+  workflow_dispatch: # 手动触发
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  code-review:
+    runs-on: ubuntu-latest
+    permissions: # 设置权限 
+      contents: read
+      pull-requests: write 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build project
+        run: npm run build
+
+      - name: Create env file
+        run: |
+          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" > codereview/.env
+          echo "GITHUB_OWNER=${{ github.repository_owner }}" >> codereview/.env
+          echo "GITHUB_REPO=${{ github.event.repository.name }}" >> codereview/.env
+          echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> codereview/.env
+          echo "LOG_LEVEL=info" >> codereview/.env
+          echo "DRY_RUN=false" >> codereview/.env
+          echo "TEST_MODE=false" >> codereview/.env
+
+      - name: Run code review
+        run: npm start
+     
+      
+        
