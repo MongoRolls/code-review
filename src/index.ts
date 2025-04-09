@@ -9,7 +9,6 @@ import { PRDiff } from './github/types';
  */
 function printDiffDetails(diffs: PRDiff[]) {
   logger.info('------------------------');
-  logger.info('差异详细信息:');
   diffs.forEach((diff, index) => {
     logger.info(`\n[文件 ${index + 1}/${diffs.length}] ${diff.filename} (状态: ${diff.status})`);
     logger.info(`添加: ${diff.additions} 行, 删除: ${diff.deletions} 行, 变更: ${diff.changes} 行`);
@@ -31,10 +30,10 @@ async function main() {
   try {
     logger.info('代码审查工具启动');
     
-    // 检查配置模式
+    // 检查配置模式 DRY_RUN时，不提交审查结果
     const isDryRun = process.env.DRY_RUN === 'true';
     
-    logger.info(`运行模式: 正常模式${isDryRun ? ' (干运行)' : ''}`);
+    logger.info(`运行模式: ${isDryRun ? '干运行' : '正常运行'}`);
     
     let diffs = [];
     let reviewResult;
