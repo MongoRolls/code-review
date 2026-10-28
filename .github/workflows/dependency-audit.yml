@@ -21,7 +21,7 @@ jobs:
       COREPACK_ENABLE_PROJECT_SPEC: '0'
       npm_config_manage_package_manager_versions: 'false'
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         persist-credentials: false
     - uses: actions/setup-node@v4
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         persist-credentials: false
     - uses: actions/setup-node@v4
