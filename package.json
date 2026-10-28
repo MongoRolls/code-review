@@ -12,7 +12,7 @@
   "author": "xzc",
   "license": "ISC",
   "dependencies": {
-    "@octokit/rest": "^19.0.13",
+    "@octokit/rest": "^20.1.2",
     "dotenv": "^16.4.7",
     "typescript": "^5.8.3"
   },
