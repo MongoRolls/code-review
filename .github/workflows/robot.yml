@@ -1,48 +1,44 @@
-name: code review
+name: Manual code review
 
-on: 
-  push: 
-    branches: 
-      - main 
-  workflow_dispatch: # 手动触发
-  pull_request: # 自动触发
-    types: [opened] # 触发条件
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: number
+
+permissions:
+  contents: read
 
 jobs:
   code-review:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    permissions: # 设置权限 
+    timeout-minutes: 10
+    permissions:
       contents: read
-      pull-requests: write 
+      pull-requests: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Setup node
-        uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
         with:
-          node-version: 18
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build project
-        run: npm run build
-
-      - name: Create env file
-        run: |
-          echo "PERSONAL_TOKEN=${{ secrets.PERSONAL_TOKEN }}" >> .env
-          echo "GITHUB_OWNER=${{ github.repository_owner }}" >> .env
-          echo "GITHUB_REPO=${{ github.event.repository.name }}" >> .env
-          echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> .env
-          echo "LOG_LEVEL=info" >> .env
-          echo "DRY_RUN=false" >> .env
-          echo "AI_API_KEY=${{ secrets.AI_API_KEY }}" >> .env
-          echo "AI_API_ENDPOINT=https://api.deepseek.com/chat/completions" >> .env
-          echo "AI_MODEL=deepseek-chat" >> .env
-
-      - name: Run code review
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      # Only trusted default-branch code runs with credentials. PR contents are data.
+      - name: Review the selected pull request
         run: npm start
-     
-      
-        
+        env:
+          PERSONAL_TOKEN: ${{ github.token }}
+          GITHUB_OWNER: ${{ github.repository_owner }}
+          GITHUB_REPO: ${{ github.event.repository.name }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          LOG_LEVEL: info
+          DRY_RUN: 'false'
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_API_ENDPOINT: https://api.deepseek.com/chat/completions
+          AI_MODEL: deepseek-chat
